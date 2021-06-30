@@ -75,7 +75,8 @@ def display_progress(task, context: ScanContext):
                      f"{task.get_stack()}")
         return
 
-    clear_last_line()
+    # clear_last_line()
+    print("\r", end="")
     if task.result():
         ip, version = task.result()
         clear_last_line()
@@ -104,11 +105,11 @@ async def main(f: TextIO):
     context = None
     for i, line in enumerate(all_line):
         start, end = tuple(map(lambda x: x.strip(), line.split(" ")))
-        logger.info(f"第{i+1}/{len(all_line)}个区间, {start}...{end}")
+        logger.info(f"第{i + 1}/{len(all_line)}个区间, {start}...{end}")
         context = ScanContext(ip_to_int(end) - ip_to_int(start))
 
         def f(task, i, all_line, start, end):
-            logger.info(f"第{i+1}/{len(all_line)}组完成, {start}...{end}")
+            logger.info(f"第{i + 1}/{len(all_line)}组完成, {start}...{end}")
 
         context.all_done.add_done_callback(partial(f, i=i, all_line=all_line, start=start, end=end))
         await scan(start, end, context)
@@ -116,9 +117,11 @@ async def main(f: TextIO):
         await context.all_done
     await asyncio.sleep(10)
 
+
 if __name__ == '__main__':
     import sys
     from logging_config import config_logging
+
     config_logging()
     assert len(sys.argv) > 2
     for i in sys.argv[1:-1]:
