@@ -11,37 +11,12 @@ import asyncio
 from asyncio import create_task
 from asyncio.locks import Semaphore
 from logging import getLogger
-from typing import TextIO
+from typing import TextIO, Iterable
 from functools import partial
+from merge_ip import ip_to_int, get_all_ip, input_and_merge
 
 logger = getLogger()
 result_logger = getLogger("result")
-
-
-def int_to_ip(num: int):
-    result = []
-    while num > 0:
-        result.append(num % 256)
-        num //= 256
-    result.reverse()
-    return ".".join(map(str, result))
-
-
-def ip_to_int(ip: str):
-    nums = [i for i in ip.split(".")]
-    assert len(nums) == 4
-    result = 0
-    for i in map(int, nums):
-        result *= 256
-        result += i
-    return result
-
-
-def get_all_ip(start: str, end: str):
-    start = ip_to_int(start)
-    end = ip_to_int(end)
-    for i in range(start, end):
-        yield int_to_ip(i)
 
 
 def clear_last_line():
@@ -67,11 +42,11 @@ WORKER = 300
 semaphore = ...
 
 
-def display_progress(task, context: ScanContext):
+def display_progress(task, context: ScanContext, ip):
     assert task.done()
     context.on_task_finish(task)
     if task.exception():
-        logger.error(f"{str(task.exception())}\n"
+        logger.error(f"{ip}->{str(task.exception())}\n"
                      f"{task.get_stack()}")
         return
 
@@ -84,14 +59,14 @@ def display_progress(task, context: ScanContext):
     print(f"完成{context.finished_task}/{context.total_task}", end="")
 
 
-async def scan(start, end, context):
+async def scan(iterable: Iterable, context):
     global semaphore
     print(f"将扫描{context.total_task}"
           f"个ip")
-    for i in get_all_ip(start, end):
+    for i in iterable:
         await semaphore.acquire()
         task = create_task(check_ssh_open(i))
-        task.add_done_callback(partial(display_progress, context=context))
+        task.add_done_callback(partial(display_progress, context=context, ip=i))
         task.add_done_callback(lambda x: semaphore.release())
         context.unfinished_tasks.add(task)
 
@@ -99,20 +74,23 @@ async def scan(start, end, context):
 async def main(f: TextIO):
     global WORKER, semaphore
     semaphore = Semaphore(WORKER)
-    all_line = [line for line in f]
-    if not all_line:
+    ip_ranges = input_and_merge(f)
+    if not ip_ranges:
         return
+    print("扫描计划：")
+    for i, ip_range in enumerate(ip_ranges):
+        print(f"{i + 1}. {ip_range}")
     context = None
-    for i, line in enumerate(all_line):
-        start, end = tuple(map(lambda x: x.strip(), line.split(" ")))
-        logger.info(f"第{i + 1}/{len(all_line)}个区间, {start}...{end}")
+    for i, ip_range in enumerate(ip_ranges):
+        start, end = ip_range
+        logger.info(f"第{i + 1}/{len(ip_ranges)}个区间, {start}...{end}")
         context = ScanContext(ip_to_int(end) - ip_to_int(start))
 
-        def f(task, i, all_line, start, end):
-            logger.info(f"第{i + 1}/{len(all_line)}组完成, {start}...{end}")
+        def f(task, i, ip_ranges, start, end):
+            logger.info(f"第{i + 1}/{len(ip_ranges)}组完成, {start}...{end}")
 
-        context.all_done.add_done_callback(partial(f, i=i, all_line=all_line, start=start, end=end))
-        await scan(start, end, context)
+        context.all_done.add_done_callback(partial(f, i=i, all_line=ip_ranges, start=start, end=end))
+        await scan(get_all_ip(start, end), context)
     if context and not context.all_done.done():
         await context.all_done
     await asyncio.sleep(10)

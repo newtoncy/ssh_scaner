@@ -3,16 +3,14 @@
 # @File    : check_ssh_open.py
 # @Date    : 2021-07-01
 # @Author  : 王超逸
-# @Brief   : 
-from asyncio import StreamReader, wait_for, TimeoutError, open_connection, run
+# @Brief   :
+from asyncio import wait_for, TimeoutError, open_connection, run
 
 
 async def check_ssh_open(ip: str):
     try:
         reader, writer = await wait_for(open_connection(ip, 22), 2)
-    except TimeoutError as e:
-        return False
-    except OSError as e:
+    except (TimeoutError, OSError) as e:
         return False
 
     try:
@@ -22,7 +20,9 @@ async def check_ssh_open(ip: str):
             return ip, s.strip()
     except TimeoutError as e:
         pass
-    writer.close()
+    finally:
+        writer.close()
+        # await writer.wait_closed()
     return False
 
 
