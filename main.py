@@ -77,11 +77,10 @@ async def main(f: TextIO):
     ip_ranges = input_and_merge(f)
     if not ip_ranges:
         return
-    logger.info("扫描计划：")
     ranges = []
     for i, ip_range in enumerate(ip_ranges):
         ranges.append(f"{i + 1}. {ip_range}")
-    logger.info("\n".join(ranges))
+    logger.info("扫描计划：\n"+"\n".join(ranges))
     context = None
     for i, ip_range in enumerate(ip_ranges):
         start, end = ip_range
