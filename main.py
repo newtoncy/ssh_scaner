@@ -91,7 +91,7 @@ async def main(f: TextIO):
         def f(task, i, ip_ranges, start, end):
             logger.info(f"第{i + 1}/{len(ip_ranges)}组完成, {start}...{end}")
 
-        context.all_done.add_done_callback(partial(f, i=i, all_line=ip_ranges, start=start, end=end))
+        context.all_done.add_done_callback(partial(f, i=i, ip_ranges=ip_ranges, start=start, end=end))
         await scan(get_all_ip(start, end), context)
     if context and not context.all_done.done():
         await context.all_done

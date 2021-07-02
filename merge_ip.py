@@ -64,9 +64,10 @@ def input_ip(file: TextIO):
 
 
 def converse_segment_to_range(ip, mask):
-    start = ip
     length = 2 ** mask
-    end = ip_to_int(start) + length
+    start = ip_to_int(ip) & ~(length-1)
+    end = start + length
+    start = int_to_ip(start)
     end = int_to_ip(end)
     return start, end
 
@@ -96,4 +97,4 @@ def merge_ip_range(ip_range: list) -> list:
 def input_and_merge(file: TextIO):
     ip_range, ip_segment = input_ip(file)
     ip_range += [converse_segment_to_range(ip, mask) for ip, mask in ip_segment]
-    return sorted(merge_ip_range(ip_range))
+    return sorted(merge_ip_range(ip_range),key=lambda x:ip_to_int(x[0]))
