@@ -25,10 +25,11 @@ def clear_last_line():
 
 
 class ScanContext:
-    def __init__(self, total_task):
+    def __init__(self, total_task, group_num):
         self.finished_task = 0
         self.total_task = total_task
         self.unfinished_tasks = set()
+        self.group_num = group_num
         self.all_done = asyncio.get_running_loop().create_future()
 
     def on_task_finish(self, task):
@@ -40,6 +41,7 @@ class ScanContext:
 
 WORKER = 300
 semaphore = ...
+N_IP_RANGE = ...
 
 
 def display_progress(task, context: ScanContext, ip):
@@ -56,7 +58,7 @@ def display_progress(task, context: ScanContext, ip):
         ip, version = task.result()
         clear_last_line()
         result_logger.info(f"{ip}->{version}")
-    print(f"完成{context.finished_task}/{context.total_task}", end="")
+    print(f"组{context.group_num}/{N_IP_RANGE}，完成{context.finished_task}/{context.total_task}", end="")
 
 
 async def scan(iterable: Iterable, context):
@@ -72,7 +74,7 @@ async def scan(iterable: Iterable, context):
 
 
 async def main(f: TextIO):
-    global WORKER, semaphore
+    global WORKER, semaphore, N_IP_RANGE
     semaphore = Semaphore(WORKER)
     ip_ranges = input_and_merge(f)
     if not ip_ranges:
@@ -80,12 +82,13 @@ async def main(f: TextIO):
     ranges = []
     for i, ip_range in enumerate(ip_ranges):
         ranges.append(f"{i + 1}. {ip_range}")
-    logger.info("扫描计划：\n"+"\n".join(ranges))
+    N_IP_RANGE = len(ranges)
+    logger.info("扫描计划：\n" + "\n".join(ranges))
     context = None
     for i, ip_range in enumerate(ip_ranges):
         start, end = ip_range
         logger.info(f"第{i + 1}/{len(ip_ranges)}个区间, {start}...{end}")
-        context = ScanContext(ip_to_int(end) - ip_to_int(start))
+        context = ScanContext(ip_to_int(end) - ip_to_int(start), i+1)
 
         def f(task, i, ip_ranges, start, end):
             logger.info(f"第{i + 1}/{len(ip_ranges)}组完成, {start}...{end}")
